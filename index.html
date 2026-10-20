@@ -1,0 +1,734 @@
+<!-- Checks passed: 2,250 total requests − 300 unsupported = 1,950 supported starts; funnel drops 135 + 297 + 118 = 550 failure causes; what-if = (connected + cause count × reduction / 100) / supported × 100, verified across all device filters. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Connections Health · Tapashi</title>
+<style>
+:root {
+  --ink: #202020;
+  --muted: #454545;
+  --green: #185c45;
+  --line: #767676;
+  --paper: #f7f7f7;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+button, select, input { font: inherit; }
+button, select { cursor: pointer; }
+button, select, input, summary { touch-action: manipulation; }
+header {
+  background: #153d36;
+  color: white;
+  padding: 21px 5%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+header strong { font-size: 19px; }
+header > span { color: #ffffff; font-size: 12px; }
+.logo {
+  display: inline-grid;
+  place-items: center;
+  background: #ffffff;
+  color: #183c32;
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  margin-right: 10px;
+}
+main { max-width: 1350px; margin: auto; padding: 24px 4% 32px; }
+h1 { font-size: 34px; letter-spacing: -1.2px; margin: 9px 0; }
+h2 { font-size: 18px; margin: 0 0 6px; }
+h3 { font-size: 14px; }
+p { line-height: 1.65; color: var(--muted); margin: 5px 0 15px; }
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: var(--green);
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: end;
+}
+.top > *, .grid > *, .metrics > *, .decision > * { min-width: 0; }
+.filters { display: flex; gap: 10px; align-items: center; }
+.filters label { font-size: 12px; color: var(--muted); min-width: 0; }
+select, button {
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 7px;
+  padding: 10px;
+  color: var(--ink);
+  min-height: 44px;
+  max-width: 100%;
+}
+select { text-overflow: ellipsis; }
+select:disabled {
+  opacity: 1;
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  background: #f2f2f2;
+  cursor: default;
+}
+.notice {
+  margin: 0 0 24px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--green);
+  border-radius: 8px;
+  padding: 11px 15px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+  margin-top: 22px;
+}
+.card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px;
+  min-width: 0;
+}
+.metric small { color: var(--muted); }
+.value { font-size: 33px; letter-spacing: -1px; font-weight: 650; margin: 11px 0 7px; }
+.metric p { font-size: 11px; margin: 0; }
+.metric-owner { margin-top: 12px !important; color: var(--green); }
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 20px;
+}
+.sub { font-size: 12px; }
+.funnel {
+  display: flex;
+  gap: 9px;
+  align-items: end;
+  margin-top: 24px;
+  height: 185px;
+}
+.step {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+}
+.bar {
+  background: #d9e7db;
+  border: 1px solid #35624b;
+  border-radius: 5px 5px 0 0;
+  min-height: 30px;
+  padding: 13px 9px;
+  position: relative;
+  color: #202020;
+}
+.step:last-child .bar { background: #185c45; color: white; border-color: #185c45; }
+.step b { display: block; font-size: 20px; }
+.step small { font-size: 10px; }
+.step label { font-size: 11px; margin-top: 9px; min-height: 28px; }
+.cause {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 35px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 15px;
+  font-size: 11px;
+}
+.track {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  height: 9px;
+  overflow: hidden;
+}
+.fill { height: 100%; background: #35624b; }
+.owner { color: var(--muted); font-size: 10px; display: block; margin-top: 3px; }
+.wide { margin-top: 20px; }
+.scroll { max-width: 100%; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 18px;
+  text-align: left;
+}
+th {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid var(--line);
+}
+td { padding: 15px 12px; border-bottom: 1px solid var(--line); }
+td b { font-size: 12px; }
+.pill {
+  display: inline-block;
+  border-radius: 20px;
+  padding: 4px 8px;
+  font-size: 10px;
+  background: #edf4e9;
+  color: #284b25;
+  border: 1px solid #60755c;
+}
+.pill.warn { background: #fff1df; color: #644018; border-color: #86633a; }
+.panelhead { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.panelhead > div { min-width: 0; }
+.panelhead > button, .panelhead > .pill { flex-shrink: 0; }
+.controls { display: flex; gap: 10px; margin: 20px 0; align-items: center; flex-wrap: wrap; }
+.controls select { max-width: 100%; min-width: 0; }
+.controls label { min-width: 0; max-width: 100%; }
+.estimate {
+  background: #eef5e8;
+  color: var(--ink);
+  border: 1px solid #60755c;
+  border-radius: 8px;
+  padding: 17px;
+  margin-top: 20px;
+}
+.estimate strong { font-size: 28px; color: var(--green); }
+.estimate-change { color: var(--green); }
+button.primary { background: var(--green); color: white; border: 1px solid var(--green); }
+.outcome {
+  min-height: 95px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #35624b;
+  padding: 12px 16px;
+  background: #f7f7f7;
+  color: var(--ink);
+  line-height: 1.7;
+  font-size: 12px;
+}
+#reduction {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--green);
+  margin-top: 15px;
+  cursor: pointer;
+}
+#reduction::-webkit-slider-runnable-track {
+  background: #ffffff;
+  border: 1px solid #555555;
+  border-radius: 6px;
+  height: 10px;
+}
+#reduction::-webkit-slider-thumb { margin-top: -4px; }
+#reduction::-moz-range-track {
+  background: #ffffff;
+  border: 1px solid #555555;
+  border-radius: 6px;
+  height: 8px;
+}
+#reduction::-moz-range-progress { background: var(--green); height: 8px; }
+#reduction::-moz-range-thumb { background: var(--green); border: 1px solid var(--green); }
+details { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+summary { cursor: pointer; font-weight: 600; min-height: 44px; line-height: 1.6; }
+details p, details li { font-size: 12px; line-height: 1.8; color: var(--muted); }
+details ul { padding-left: 22px; }
+.decision { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.decision article { border-top: 2px solid #35624b; padding-top: 13px; }
+.decision b { font-size: 13px; }
+.decision p { font-size: 12px; margin-top: 8px; }
+footer { margin-top: 25px; font-size: 11px; line-height: 1.8; color: var(--muted); }
+footer p { font-size: inherit; margin-top: 8px; }
+a { color: var(--green); }
+:focus-visible { outline: 3px solid #111111; outline-offset: 4px; }
+header :focus-visible { outline-color: white; }
+
+@media (max-width: 1000px) {
+  .top { display: block; }
+  .filters { margin-top: 20px; }
+}
+@media (max-width: 850px) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .decision { grid-template-columns: minmax(0, 1fr); }
+  .cause { grid-template-columns: 145px minmax(0, 1fr) 30px; }
+  header > span { display: none; }
+
+  table, tbody { display: block; width: 100%; }
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  tbody tr {
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 14px;
+    padding: 4px 12px;
+  }
+  tbody td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 10px 0;
+  }
+  tbody td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 600;
+  }
+  tbody td:last-child { border-bottom: 0; }
+  tbody td > span { min-width: 0; }
+}
+@media (max-width: 450px) {
+  main { padding: 20px 16px 24px; }
+  .card { padding: 16px; }
+  .value { font-size: 28px; }
+  .filters { align-items: end; flex-wrap: wrap; }
+  .filters label { flex: 1 1 130px; }
+  .filters select { width: 100%; }
+  h1 { font-size: 29px; }
+  .panelhead { flex-wrap: wrap; }
+  .funnel { gap: 5px; height: 200px; }
+  .bar { padding: 10px 4px; }
+  .step b { font-size: 16px; }
+  .step small { font-size: 10px; }
+  .step label { min-height: 42px; }
+  .cause { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 28px; gap: 8px; }
+  .controls > select { width: 100%; }
+  .controls label, .controls label select { display: block; width: 100%; }
+}
+@media (max-width: 340px) {
+  .metrics { grid-template-columns: minmax(0, 1fr); }
+  header { padding: 18px 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <strong><span class="logo" aria-hidden="true">ϟ</span>Connections Health</strong>
+  <span>ENERGY PLATFORM / PRODUCT EXPLORATION</span>
+</header>
+
+<main>
+  <div class="notice">
+    ◉ Synthetic data · Fictional manufacturers · Learning project, not live telemetry.
+    Each record represents one connection journey, including retries.
+  </div>
+
+  <div class="top">
+    <div>
+      <div class="eyebrow">PORTFOLIO PROTOTYPE · TAPASHI KALITA LAHKAR</div>
+      <h1>From connection to confidence.</h1>
+      <p>A shared view of device onboarding. Find the friction. Prioritise the fix.</p>
+    </div>
+    <div class="filters">
+      <label for="type">Device type<br>
+        <select id="type">
+          <option value="all">All devices</option>
+          <option>EV charger</option>
+          <option>Home battery</option>
+          <option>Solar inverter</option>
+        </select>
+      </label>
+      <label for="window">Reporting window<br>
+        <select id="window" disabled aria-label="Reporting window">
+          <option>Last 30 days · demo</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <section class="metrics" id="metrics" aria-label="Connection metrics"></section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="panelhead">
+        <div>
+          <h2>The connection journey</h2>
+          <p class="sub">Cumulative progress across supported connection requests.</p>
+        </div>
+        <span class="pill">30-day cohort</span>
+      </div>
+      <div class="funnel" id="funnel"></div>
+      <p class="sub" id="excluded" style="margin-top:15px"></p>
+    </section>
+    <section class="card">
+      <h2>Where connections break</h2>
+      <p class="sub">One final cause per unsuccessful journey. Ranked by impact.</p>
+      <div id="causes"></div>
+    </section>
+  </div>
+
+  <section class="card wide">
+    <div class="panelhead">
+      <div>
+        <h2>Manufacturer performance</h2>
+        <p class="sub">Supported manufacturers ranked by failed journeys; unsupported demand shown separately.</p>
+      </div>
+      <button id="export" type="button">Export CSV ↓</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Manufacturer / device</th>
+            <th scope="col">Status</th>
+            <th scope="col">Requests</th>
+            <th scope="col">Success</th>
+            <th scope="col">First time</th>
+            <th scope="col">Median time</th>
+            <th scope="col">Failed</th>
+          </tr>
+        </thead>
+        <tbody id="manufacturers"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="eyebrow">DECISION LAB</div>
+      <h2 style="margin-top:7px">What if we fix one cause?</h2>
+      <p class="sub">Estimate the upside before committing engineering capacity.</p>
+      <label class="sub" for="causeSelect">Failure cause</label>
+      <div class="controls"><select id="causeSelect"></select></div>
+      <label class="sub" for="reduction">
+        Reduce this cause by <strong id="reductionLabel">50%</strong>
+      </label>
+      <input id="reduction" type="range" min="0" max="100" value="50">
+      <div class="estimate" id="estimate" aria-live="polite" aria-atomic="true"></div>
+      <p class="sub" style="margin-top:12px">Upper-bound scenario: recovered journeys reach live data, with no downstream failures. This is an estimate, not a forecast. Coverage does not change.</p>
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">EXPLORE THE EXPERIENCE</div>
+      <h2 style="margin-top:7px">Simulate a connection</h2>
+      <p class="sub">A probabilistic illustration using the selected manufacturer’s observed synthetic rates.</p>
+      <div class="controls">
+        <select id="simMaker" aria-label="Manufacturer for simulation"></select>
+        <button class="primary" id="simulate" type="button">Run connection →</button>
+      </div>
+      <div class="outcome" id="outcome" aria-live="polite" aria-atomic="true">
+        Choose a manufacturer and run a connection to explore a possible outcome and its next diagnostic step.
+      </div>
+      <p class="sub" style="margin-top:13px">Independent draws; results do not change the dashboard. Unsupported devices stop before authorisation.</p>
+    </section>
+  </div>
+
+  <section class="card wide">
+    <div class="eyebrow">STRATEGY EXPLORATION</div>
+    <h2 style="margin-top:7px">Beyond the first device connection</h2>
+    <p class="sub">A device sending data is only one prerequisite for flexibility. Explore the additional product decisions below. These are discovery hypotheses to test with the real team, not verified requirements.</p>
+    <div class="controls">
+      <label for="strategy">Explore a decision
+        <select id="strategy">
+          <option value="readiness">Customer &amp; tariff readiness</option>
+          <option value="reuse">Reusable integrations</option>
+          <option value="markets">International readiness</option>
+          <option value="discovery">Partner discovery</option>
+        </select>
+      </label>
+    </div>
+    <div class="outcome" id="strategyResult" aria-live="polite" aria-atomic="true"></div>
+  </section>
+
+  <section class="card wide">
+    <div class="eyebrow">PRODUCT JUDGEMENT</div>
+    <h2 style="margin-top:7px">Where I would start</h2>
+    <div class="decision">
+      <article>
+        <b>01 / Isolate protocol failures</b>
+        <p>Investigate Ember’s legacy charger handshake. Inspect message traces and reproduce failures in a protocol test harness before choosing a fix.</p>
+      </article>
+      <article>
+        <b>02 / Test the consent experience</b>
+        <p>Clarify access permissions and test shorter copy. Measure completion alongside informed consent; send reminders only where permitted.</p>
+      </article>
+      <article>
+        <b>03 / Validate unmet demand</b>
+        <p>Use unsupported requests to shortlist integrations, then compare reachable demand, partner access, delivery effort and commercial value.</p>
+      </article>
+    </div>
+
+    <details>
+      <summary>Metric definitions, assumptions &amp; validation plan</summary>
+      <ul>
+        <li><b>Connection success:</b> live-data journeys ÷ supported requests. Retried successes included. Unsupported requests are excluded, and measured through coverage.</li>
+        <li><b>Time to connect:</b> median minutes from start to first data, among connected journeys. Synthetic medians are calculated from individual durations, not averaged manufacturer medians.</li>
+        <li><b>First-time success:</b> journeys reaching data without a retry or support contact ÷ supported requests.</li>
+        <li><b>Device coverage:</b> supported requests ÷ all requests. This measures observed request coverage, not share of all devices in the market.</li>
+        <li>Stages are cumulative. A final failure cause maps to exactly one stage and owner. Waiting/in-progress journeys are excluded from this completed cohort.</li>
+        <li>To validate: agree the definition and freshness threshold for “live data”, instrument journey IDs, consent events, handshake events, errors, retry counts, support contacts and timestamps. Define deduplication, observation windows, privacy and retention with engineering.</li>
+        <li>Next research: interview installers, support and integration engineers; validate root causes; test the proposed diagnostics and prioritisation workflow. No customer research or measured business outcomes are claimed here.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>About this portfolio case study</summary>
+      <p>20 October 2026 · Tapashi Kalita Lahkar. This independent exploration applies product thinking to home batteries, EV chargers and solar inverters. It draws on experience with EV charging integrations, simulated test environments and platform data quality. All manufacturer names, numbers and outcomes here are invented. The prototype demonstrates hypothesis generation and prioritisation, rather than a production monitoring system.</p>
+    </details>
+  </section>
+
+  <footer>
+    CONNECTIONS HEALTH · Independent portfolio exploration · Synthetic cohort v1 · No account or live device connection required
+    <p>Built by Tapashi Kalita Lahkar as a learning exercise. Not real operational data.</p>
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+const causes = [
+  ["Authorisation abandoned", "Product & design", "authorise", "Test consent copy and inspect consent-screen completion."],
+  ["Manufacturer API timeout", "Partner engineering", "handshake", "Check partner latency, rate limits and retry backoff."],
+  ["Legacy protocol mismatch", "Integration engineering", "handshake", "Inspect protocol traces and replay messages in a test harness."],
+  ["Expired access token", "Platform engineering", "data", "Inspect token refresh, expiry and revocation handling."],
+  ["Home network offline", "Support & installer", "handshake", "Check device reachability and local network setup."],
+  ["Telemetry not received", "Data platform", "data", "Trace telemetry ingestion and device timestamps."]
+];
+
+const makers = [
+  {name: "Ember", type: "EV charger", n: 420, fail: [35,25,90,15,20,15], retry: 45},
+  {name: "Voltleaf", type: "EV charger", n: 310, fail: [20,15,10,8,12,5], retry: 30},
+  {name: "HearthCell", type: "Home battery", n: 390, fail: [25,20,0,15,20,10], retry: 38},
+  {name: "Storedawn", type: "Home battery", n: 260, fail: [18,12,0,10,15,5], retry: 22},
+  {name: "Solmere", type: "Solar inverter", n: 350, fail: [22,20,0,12,16,10], retry: 32},
+  {name: "Raynest", type: "Solar inverter", n: 220, fail: [15,10,0,8,12,5], retry: 18},
+  {name: "Northspark", type: "EV charger", n: 140, unsupported: true},
+  {name: "StillGrid", type: "Home battery", n: 75, unsupported: true},
+  {name: "Sunhollow", type: "Solar inverter", n: 85, unsupported: true}
+];
+
+const sum = a => a.reduce((x, y) => x + y, 0);
+const pct = (n, d) => (d ? 100 * n / d : 0).toFixed(1) + "%";
+const fmt = n => Math.round(n).toLocaleString("en-GB");
+const $ = selector => document.querySelector(selector);
+
+makers.forEach((m, i) => {
+  if (!m.unsupported) {
+    m.success = m.n - sum(m.fail);
+    m.first = m.success - m.retry;
+    m.times = Array.from(
+      {length: m.success},
+      (_, j) => +(1.5 + ((j * 37 + i * 19) % 180) / 10 + (i === 0 ? 4 : 0)).toFixed(1)
+    );
+  }
+});
+
+const median = a => {
+  a = [...a].sort((x, y) => x - y);
+  return a.length
+    ? (a[Math.floor((a.length - 1) / 2)] + a[Math.floor(a.length / 2)]) / 2
+    : 0;
+};
+
+let current;
+
+function render() {
+  const f = $("#type").value;
+  const rows = makers.filter(m => f === "all" || m.type === f);
+  const supported = rows.filter(m => !m.unsupported);
+  const n = sum(supported.map(m => m.n));
+  const total = sum(rows.map(m => m.n));
+  const success = sum(supported.map(m => m.success));
+  const first = sum(supported.map(m => m.first));
+  const fail = causes.map((_, i) => sum(supported.map(m => m.fail[i])));
+  current = {rows, n, total, success, fail};
+
+  const metrics = [
+    ["Connection success", pct(success, n), "Live-data journeys / supported requests", "Product + engineering"],
+    ["Median time to connect", median(supported.flatMap(m => m.times)).toFixed(1) + " min", "Start → first data · successful journeys", "Engineering"],
+    ["First-time success", pct(first, n), "No retry or support / supported requests", "Product design"],
+    ["Device coverage", pct(n, total), "Supported requests / all requests", "Partnerships"]
+  ];
+
+  $("#metrics").innerHTML = metrics.map(m => `
+    <article class="card metric">
+      <small>${m[0]}</small>
+      <div class="value">${m[1]}</div>
+      <p>${m[2]}</p>
+      <p class="metric-owner">${m[3]}</p>
+    </article>
+  `).join("");
+
+  const stages = [
+    n,
+    n - fail[0],
+    n - fail[0] - fail[1] - fail[2] - fail[4],
+    success
+  ];
+
+  $("#funnel").innerHTML = stages.map((v, i) => `
+    <div class="step">
+      <div class="bar" style="height:${v / n * 155}px">
+        <b>${fmt(v)}</b>
+        <small>${pct(v, n)} of starts</small>
+      </div>
+      <label>${["Started", "Authorised", "Handshake complete", "Live data"][i]}</label>
+    </div>
+  `).join("");
+
+  $("#excluded").textContent =
+    `${fmt(total - n)} unsupported requests excluded from funnel · ${fmt(n - success)} failed supported journeys.`;
+
+  $("#causes").innerHTML = fail
+    .map((v, i) => ({v, i}))
+    .sort((a, b) => b.v - a.v)
+    .map(({v, i}) => `
+      <div class="cause">
+        <div>${causes[i][0]}<span class="owner">${causes[i][1]}</span></div>
+        <div class="track" aria-hidden="true">
+          <div class="fill" style="width:${v / Math.max(...fail) * 100}%"></div>
+        </div>
+        <b>${v}</b>
+      </div>
+    `).join("");
+
+  $("#manufacturers").innerHTML = [...rows]
+    .sort((a, b) =>
+      (Number(!!a.unsupported) - Number(!!b.unsupported)) ||
+      ((b.fail ? sum(b.fail) : b.n) - (a.fail ? sum(a.fail) : a.n))
+    )
+    .map(m => `
+      <tr>
+        <td data-label="Manufacturer / device">
+          <span><b>${m.name}</b><span class="owner">${m.type}</span></span>
+        </td>
+        <td data-label="Status">
+          <span><span class="pill ${m.unsupported ? "warn" : ""}">${m.unsupported ? "Not supported" : "Supported"}</span></span>
+        </td>
+        <td data-label="Requests"><span>${m.n}</span></td>
+        <td data-label="Success"><span>${m.unsupported ? "—" : pct(m.success, m.n)}</span></td>
+        <td data-label="First time"><span>${m.unsupported ? "—" : pct(m.first, m.n)}</span></td>
+        <td data-label="Median time"><span>${m.unsupported ? "—" : median(m.times).toFixed(1) + " min"}</span></td>
+        <td data-label="Failed"><span>${m.unsupported ? "—" : sum(m.fail)}</span></td>
+      </tr>
+    `).join("");
+
+  $("#simMaker").innerHTML = rows
+    .map(m => `<option value="${m.name}">${m.name} · ${m.type}</option>`)
+    .join("");
+
+  $("#outcome").textContent =
+    "Run a connection to explore a possible outcome and the next diagnostic step.";
+
+  estimate();
+}
+
+function estimate() {
+  const i = +$("#causeSelect").value;
+  const r = +$("#reduction").value;
+  const recovered = current.fail[i] * r / 100;
+
+  $("#reductionLabel").textContent = r + "%";
+  $("#reduction").setAttribute("aria-valuetext", r + "%");
+
+  $("#estimate").innerHTML = `
+    <span class="sub">Estimated connection success</span><br>
+    <strong>${pct(current.success + recovered, current.n)}</strong>
+    <span class="estimate-change">+${(recovered / current.n * 100).toFixed(1)} percentage points</span>
+    <div class="sub" style="margin-top:8px">${recovered.toFixed(1)} additional expected live-data journeys · baseline ${pct(current.success, current.n)}</div>
+  `;
+}
+
+$("#causeSelect").innerHTML = causes
+  .map((c, i) => `<option value="${i}">${c[0]}</option>`)
+  .join("");
+
+$("#type").addEventListener("change", render);
+$("#causeSelect").addEventListener("change", estimate);
+$("#reduction").addEventListener("input", estimate);
+
+$("#simulate").addEventListener("click", () => {
+  const m = makers.find(m => m.name === $("#simMaker").value);
+  let msg;
+
+  if (m.unsupported) {
+    msg = `Coverage gap · ${m.name} is not supported. Validate demand and integration feasibility with partnerships before offering a connection.`;
+  } else {
+    let draw = Math.random() * m.n;
+    let index = -1;
+
+    for (let i = 0; i < m.fail.length; i++) {
+      draw -= m.fail[i];
+      if (draw < 0) {
+        index = i;
+        break;
+      }
+    }
+
+    msg = index < 0
+      ? `✓ Live data flowing · ${m.name}. Start → authorisation → handshake → first data. Next: verify freshness and ongoing reliability; a successful first connection does not prove a healthy long-term connection.`
+      : `Stopped at ${causes[index][2]} · ${causes[index][0]}. Owner: ${causes[index][1]}. ${causes[index][3]}`;
+  }
+
+  $("#outcome").textContent = msg;
+});
+
+$("#export").addEventListener("click", () => {
+  const lines = [
+    ["Manufacturer", "Device type", "Supported", "Requests", "Connected", "First time", "Failed"],
+    ...current.rows.map(m => [
+      m.name,
+      m.type,
+      !m.unsupported,
+      m.n,
+      m.success ?? "",
+      m.first ?? "",
+      m.fail ? sum(m.fail) : ""
+    ])
+  ];
+
+  const url = URL.createObjectURL(new Blob(
+    ["Synthetic data - Connections Health\n" + lines.map(r => r.join(",")).join("\n")],
+    {type: "text/csv"}
+  ));
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "connections-health-synthetic.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+const strategies = {
+  readiness: "Proposed readiness gates: customer consent → supported asset → fresh telemetry → eligible tariff → valid control permission. Do not label an asset “ready to optimise” until each applicable gate passes. Discovery: who owns tariff eligibility and how are changes or revoked consent handled? Measure eligible-to-active conversion separately from device connection success.",
+  reuse: "Proposed integration approach: a common adapter contract for authorisation, capability discovery, telemetry and errors, with partner-specific adapters and contract tests. Investigate rate limits, versioning, idempotency and token lifecycle with engineering. Trade-off: abstract repeated behaviour without hiding OEM-specific capabilities. Measure engineer-days to onboard a partner and adapter reuse, alongside reliability.",
+  markets: "Proposed market-entry gates: partner/API access, connectivity standards, customer permissions, tariff mapping, localisation, data handling and operational support. Require evidence and an accountable owner for each gate before a launch decision. No countries are marked launch-ready: country-specific legal and technical requirements have not been researched.",
+  discovery: "OEMs: how do firmware versions, API limits and telemetry guarantees vary? Suppliers: how are customer identity and tariffs linked? Aggregators: which capabilities and dispatch acknowledgements are required? Customers/installers: where do setup and permissions become confusing? Validate frequency, cost and impact before prioritising; the dashboard alone cannot establish root cause."
+};
+
+function showStrategy() {
+  $("#strategyResult").textContent = strategies[$("#strategy").value];
+}
+
+$("#strategy").addEventListener("change", showStrategy);
+render();
+showStrategy();
+</script>
+</body>
+</html>
